@@ -13,7 +13,7 @@
 - 自动适配视野范围，最多支持 40 张地图卡片 / 会话，200 个会话
 - 会话中消息文本、文件投递、工作区扫描三种来源的 GeoJSON 均自动检测，无需任何配置
 
-![GeoJSON 地图视图](assets/screenshot-viewer.png)
+![GeoJSON 地图视图](assets/screenshots.png)
 
 ## 安装
 
