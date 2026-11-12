@@ -1,0 +1,21 @@
+{
+  "meta": {
+    "title": "GeoJSON Map Viewer",
+    "description": "Renders GeoJSON text and files in the session as a 2D Leaflet map with base-map switching and a feature attribute table."
+  },
+  "viewer": {
+    "title": "GeoJSON Map Viewer",
+    "openButton": "View as Map",
+    "loading": "Loading map…",
+    "loadFailed": "Failed to load map library",
+    "featureCount": "{n} feature(s)",
+    "dataTable": "View Data Table",
+    "geometryType": "Geometry",
+    "baseMap": "Base map",
+    "selectSource": "GeoJSON source",
+    "layer_osm": "OpenStreetMap",
+    "layer_arcgisImagery": "ArcGIS Satellite",
+    "noFeatures": "No features found",
+    "error": "Error"
+  }
+}

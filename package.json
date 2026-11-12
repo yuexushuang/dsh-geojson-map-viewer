@@ -1,0 +1,35 @@
+{
+  "name": "@local/dsh-geojson-map-viewer",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "geojson-util.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "vendor/leaflet.js",
+    "vendor/leaflet.css",
+    "vendor/images/marker-icon.png",
+    "vendor/images/marker-icon-2x.png",
+    "vendor/images/marker-shadow.png",
+    "vendor/images/layers.png",
+    "vendor/images/layers-2x.png"
+  ],
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": ["@deepseek-ai/dsh-client-ui-conversation"]
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "meta": {
+    "title": "GeoJSON 地图查看器",
+    "description": "将会话中的 GeoJSON 文本或文件以 Leaflet 二维地图形式呈现，支持底图切换（卫星/矢量）与要素属性表。"
+  },
+  "viewer": {
+    "title": "GeoJSON 地图查看器",
+    "openButton": "地图查看",
+    "loading": "正在加载地图…",
+    "loadFailed": "地图库加载失败",
+    "featureCount": "{n} 个要素",
+    "dataTable": "查看数据表",
+    "geometryType": "几何类型",
+    "baseMap": "底图",
+    "selectSource": "GeoJSON 文件",
+    "layer_osm": "OpenStreetMap 矢量",
+    "layer_arcgisImagery": "ArcGIS 影像",
+    "noFeatures": "未找到要素",
+    "error": "错误"
+  }
+}

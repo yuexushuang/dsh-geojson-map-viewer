@@ -1,0 +1,4 @@
+- insert:
+    - id: dsh-geojson-map-viewer
+      name: '@local/dsh-geojson-map-viewer'
+      config: {}
