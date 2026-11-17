@@ -13,7 +13,7 @@
  * reaching a public CDN. CDNs remain a last-resort fallback.
  */
 window.__ModuleLoader__.load({
-  id: '@local/dsh-geojson-map-viewer',
+  id: '@yuexushuang/dsh-geojson-map-viewer',
   factory(require) {
     const React = require('react');
     const h = React.createElement;
@@ -46,7 +46,7 @@ window.__ModuleLoader__.load({
     // marker images from its own `vendor/` directory at
     // `/geojson-viewer-vendor/...`. The `/plugins` route only serves the
     // built client bundle and image assets, so the old
-    // `plugins/@local/dsh-geojson-map-viewer/leaflet.js` URLs always 404'd and
+    // `plugins/@yuexushuang/dsh-geojson-map-viewer/leaflet.js` URLs always 404'd and
     // the viewer fell back to a CDN. CDNs remain a last resort only.
     const LEAFLET_BASE = '/geojson-viewer-vendor/';
     let leafletPromise = null;
