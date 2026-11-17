@@ -1,5 +1,5 @@
 {
-  "name": "@local/dsh-geojson-map-viewer",
+  "name": "@yuexushuang/dsh-geojson-map-viewer",
   "version": "1.0.0",
   "private": true,
   "type": "module",
