@@ -32,6 +32,7 @@ const LIST_PATH = '/api/geojson-viewer/list';
 const RECENT_PATH = '/api/geojson-viewer/recent';
 const READ_PATH = '/api/geojson-viewer/read';
 const OPEN_PATH = '/api/geojson-viewer/open';
+const PRESENTED_PATH = '/api/geojson-viewer/presented';
 const SCAN_PATH = '/api/geojson-viewer/scan-workspace';
 const WORKSPACE_PATH = '/api/geojson-viewer/workspace';
 
@@ -118,12 +119,27 @@ function hasCardFor(sessionId, filePath) {
   return bucket.cards.some((card) => card.filePath && normalizeForCompare(card.filePath) === wanted);
 }
 
+/**
+ * Append one card to a session's registry.
+ *
+ * A card may carry a stable `dedupeKey`. The automatic assistant-message scan
+ * and the explicit "View as Map" action derive the same key for the same
+ * message (`msg:<messageId>:<featureCollectionIndex>`), so clicking the action
+ * for a message that was already detected resolves to the existing card
+ * instead of appending a duplicate viewer entry.
+ */
 function pushCard(sessionId, card) {
+  const dedupeKey = typeof card?.dedupeKey === 'string' && card.dedupeKey !== '' ? card.dedupeKey : null;
+  if (dedupeKey) {
+    const existing = registry.get(sessionId)?.cards.find((c) => c.dedupeKey === dedupeKey);
+    if (existing) return existing;
+  }
   const b = bucketFor(sessionId);
   const id = `gmv-${b.nextSeq++}`;
   const record = {
     id,
     sessionId,
+    dedupeKey,
     title: card.title || 'GeoJSON',
     source: card.source,
     filePath: card.filePath || null,
@@ -267,11 +283,19 @@ function computeBounds(fc) {
   return { southWest: [minLat, minLng], northEast: [maxLat, maxLng], featureCount: count };
 }
 
-function scanText(sessionId, text, origin) {
+/**
+ * Detect GeoJSON inside free text and register one card per FeatureCollection.
+ *
+ * `dedupeKey` (when the source has a durable identity, such as an assistant
+ * message id) becomes the card's key prefix, so the client-side "View as Map"
+ * action can address the very same FeatureCollection at index 0.
+ */
+function scanText(sessionId, text, origin, dedupeKey) {
   if (!looksLikeGeoJson(text)) return;
   const found = extractFeatureCollections(text, { limit: 4 });
   if (!found.length) return;
-  for (const fc of found) {
+  for (let index = 0; index < found.length; index += 1) {
+    const fc = found[index];
     const size = JSON.stringify(fc).length;
     const inline = size <= INLINE_CAP;
     pushCard(sessionId, {
@@ -282,6 +306,7 @@ function scanText(sessionId, text, origin) {
       bounds: computeBounds(fc),
       payload: inline ? fc : null,
       tooLarge: !inline,
+      dedupeKey: dedupeKey ? `${dedupeKey}:${index}` : null,
     });
   }
 }
@@ -308,6 +333,36 @@ function addFileCard(sessionId, rawPath, title, source, description) {
   return true;
 }
 
+/**
+ * Resolve the card that belongs to one presented file, creating the deferred
+ * file card when the session log has not produced it yet. The delivery card's
+ * action URL carries the durable coordinates `(seq, index)`; this maps them
+ * back to the file the client wants to draw.
+ * @returns the card record, or null when the coordinates name no GeoJSON file.
+ */
+function cardForPresentedFile(ctx, sessionId, seq, index) {
+  const session = sessionOf(ctx, sessionId);
+  let rawPath;
+  try {
+    const event = session?.eventAt?.(seq);
+    if (event?.type === 'deliverables/presented') {
+      const files = Array.isArray(event.data?.files) ? event.data.files : [];
+      const file = files[index];
+      if (file && typeof file.path === 'string' && file.path.length > 0) rawPath = file.path;
+    }
+  } catch { /* event window unavailable — treat as not found */ }
+  if (!rawPath) return null;
+  const filePath = filePathFor(sessionId, rawPath);
+  if (!filePath) return null;
+  const mine = () => registry.get(sessionId)?.cards.find(
+    (card) => card.filePath && normalizeForCompare(card.filePath) === normalizeForCompare(filePath),
+  );
+  const existing = mine();
+  if (existing) return existing;
+  addFileCard(sessionId, rawPath, baseName(rawPath), 'present-file', 'Presented file looks like GeoJSON.');
+  return mine() ?? null;
+}
+
 function onSessionEvent(session, event) {
   if (!session?.id || !event || typeof event !== 'object') return;
   const sid = session.id;
@@ -321,7 +376,16 @@ function onSessionEvent(session, event) {
     case 'system/message':
     case 'developer/message': {
       const msg = data.message || data;
-      scanText(sid, textOfContent(msg.content), type === 'assistant/message' ? 'assistant-message' : 'user-message');
+      const isAssistant = type === 'assistant/message';
+      // The durable message id lets the client's "View as Map" action address
+      // exactly this message's first FeatureCollection (see pushCard).
+      const messageId = isAssistant && typeof msg.id === 'string' && msg.id !== '' ? msg.id : null;
+      scanText(
+        sid,
+        textOfContent(msg.content),
+        isAssistant ? 'assistant-message' : 'user-message',
+        messageId ? `msg:${messageId}` : null,
+      );
       return;
     }
     case 'deliverables/presented': {
@@ -957,6 +1021,57 @@ export function apply(ctx) {
         sendJson(res, 200, { card });
       },
     }, `geojson-viewer: POST ${OPEN_PATH}`);
+
+    register({
+      kind: 'exact',
+      path: PRESENTED_PATH,
+      handler: async (req, res) => {
+        if (rejected(req, res)) return;
+        if (req.method !== 'POST') {
+          res.statusCode = 405;
+          res.setHeader('allow', 'POST');
+          res.end();
+          return;
+        }
+        let text;
+        try {
+          const chunks = [];
+          let size = 0;
+          for await (const chunk of req) {
+            chunks.push(chunk);
+            size += chunk.length;
+            if (size > 64 * 1024) {
+              sendJson(res, 413, { code: 'payload-too-large', message: 'request body too large' });
+              return;
+            }
+          }
+          text = Buffer.concat(chunks).toString('utf8');
+        } catch (error) {
+          sendJson(res, 400, { code: 'bad-request', message: String(error?.message || error) });
+          return;
+        }
+        let body;
+        try {
+          body = JSON.parse(text);
+        } catch {
+          sendJson(res, 400, { code: 'bad-request', message: 'invalid JSON body' });
+          return;
+        }
+        const sessionId = body?.sessionId;
+        const seq = Number(body?.seq);
+        const index = Number(body?.index);
+        if (!sessionId || !Number.isSafeInteger(seq) || seq < 0 || !Number.isSafeInteger(index) || index < 0) {
+          sendJson(res, 400, { code: 'bad-request', message: 'missing or invalid sessionId/seq/index' });
+          return;
+        }
+        const card = cardForPresentedFile(ctx, sessionId, seq, index);
+        if (!card) {
+          sendJson(res, 404, { code: 'not-found', message: 'no GeoJSON card for this presented file' });
+          return;
+        }
+        sendJson(res, 200, { card });
+      },
+    }, `geojson-viewer: POST ${PRESENTED_PATH}`);
 
     register({
       kind: 'exact',
