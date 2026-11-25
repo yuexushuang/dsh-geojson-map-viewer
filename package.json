@@ -3,6 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yuexushuang/dsh-geojson-map-viewer.git"
+  },
   "exports": {
     ".": "./index.js",
     "./client": "./client.js",
